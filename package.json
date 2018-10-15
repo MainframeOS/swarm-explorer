@@ -1,18 +1,30 @@
 {
-  "name": "swarm-fs",
+  "name": "swarm-explorer",
   "version": "0.1.0",
   "private": true,
-  "dependencies": {
-    "react": "^16.5.2",
-    "react-dom": "^16.5.2",
-    "react-scripts": "2.0.4"
-  },
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
-    "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "upload": "swarm --defaultpath ./build/index.html --recursive up ./build",
+    "deploy": "yarn build && yarn upload",
+    "test": "flow check"
   },
+  "dependencies": {
+    "@erebos/swarm-browser": "^0.4.2",
+    "@material-ui/core": "^3.2.1",
+    "@material-ui/icons": "^3.0.1",
+    "bytes": "^3.0.0",
+    "history": "^4.7.2",
+    "query-string": "^6.2.0",
+    "react": "^16.5.2",
+    "react-dom": "^16.5.2",
+    "react-scripts": "2.0.5",
+    "typeface-roboto": "^0.0.54"
+  },
+  "devDependencies": {
+    "flow-bin": "^0.83.0"
+  },
+  "homepage": "./",
   "eslintConfig": {
     "extends": "react-app"
   },
