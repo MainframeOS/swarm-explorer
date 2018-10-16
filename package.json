@@ -11,7 +11,7 @@
   },
   "dependencies": {
     "@erebos/swarm-browser": "^0.4.2",
-    "@material-ui/core": "^3.2.1",
+    "@material-ui/core": "^3.2.2",
     "@material-ui/icons": "^3.0.1",
     "bytes": "^3.0.0",
     "history": "^4.7.2",

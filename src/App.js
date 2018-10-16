@@ -1,123 +1,38 @@
 // @flow
 
-import { SwarmClient } from '@erebos/swarm-browser'
 import AppBar from '@material-ui/core/AppBar'
 import Button from '@material-ui/core/Button'
 import CssBaseline from '@material-ui/core/CssBaseline'
-import Dialog from '@material-ui/core/Dialog'
-import DialogActions from '@material-ui/core/DialogActions'
-import DialogContent from '@material-ui/core/DialogContent'
-import DialogTitle from '@material-ui/core/DialogTitle'
-import IconButton from '@material-ui/core/IconButton'
 import Paper from '@material-ui/core/Paper'
-import Table from '@material-ui/core/Table'
-import TableBody from '@material-ui/core/TableBody'
-import TableCell from '@material-ui/core/TableCell'
-import TableHead from '@material-ui/core/TableHead'
-import TableRow from '@material-ui/core/TableRow'
 import TextField from '@material-ui/core/TextField'
 import Toolbar from '@material-ui/core/Toolbar'
-import Tooltip from '@material-ui/core/Tooltip'
 import Typography from '@material-ui/core/Typography'
 import { withStyles } from '@material-ui/core/styles'
-import AddIcon from '@material-ui/icons/Add'
-import UploadIcon from '@material-ui/icons/CloudUpload'
-import CreateFolderIcon from '@material-ui/icons/CreateNewFolder'
-import DeleteIcon from '@material-ui/icons/Delete'
-import DownloadIcon from '@material-ui/icons/CloudDownload'
-import bytes from 'bytes'
+import AddIcon from '@material-ui/icons/AddCircle'
+import InfoIcon from '@material-ui/icons/Info'
 import React, { Component, Fragment, createRef } from 'react'
 
-import history, { createOnClickPath, getParams, setParams } from './history'
+import history, { getParams, setParams } from './history'
+import {
+  EMPTY_TREE,
+  client,
+  createTree,
+  readFileBuffer,
+  type VirtualDir,
+} from './swarm'
 
-const EMPTY_TREE = {
-  directories: [],
-  files: [],
-  filesCount: 0,
-  size: 0,
-}
-
-type VirtualFile = {
-  contentType: string,
-  date: Date,
-  hash: string,
-  path: string,
-  size: number,
-}
-
-type VirtualDir = {
-  date: Date,
-  directories: Array<string>,
-  files: Array<VirtualFile>,
-  filesCount: number,
-  hash: string,
-  path: string,
-  size: number,
-  subpaths: { [path: string]: VirtualDir },
-}
-
-const createTree = async (
-  client: SwarmClient,
-  hash: string,
-  path: string = '',
-): Promise<VirtualDir> => {
-  const list = await client.bzz.list(hash, { path })
-
-  let date = new Date()
-  let filesCount = 0
-  let size = 0
-
-  let subpaths = {}
-  let directories = []
-  if (list.common_prefixes != null) {
-    directories = list.common_prefixes
-    const directoriesData = await Promise.all(
-      list.common_prefixes.map(dirPath => createTree(client, hash, dirPath)),
-    )
-    subpaths = directoriesData.reduce((acc, dir) => {
-      if (dir.date < date) date = dir.date
-      filesCount += dir.filesCount
-      size += dir.size
-      acc[dir.path] = dir
-      return { ...acc, ...dir.subpaths }
-    }, {})
-  }
-
-  let files = []
-  if (list.entries != null) {
-    files = list.entries.map(entry => {
-      const fileDate = new Date(entry.mod_time)
-      const fileSize = entry.size || 0
-      if (fileDate < date) date = fileDate
-      size += fileSize
-      return {
-        path: entry.path,
-        hash: entry.hash,
-        contentType: entry.contentType,
-        date: fileDate,
-        size: fileSize,
-      }
-    })
-  }
-  filesCount += files.length
-
-  return { date, directories, files, filesCount, hash, path, size, subpaths }
-}
-
-const readFileBuffer = (file: File): Promise<Buffer> => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.addEventListener('error', reject)
-    reader.addEventListener('loadend', () => {
-      resolve(Buffer.from(reader.result))
-    })
-    reader.readAsArrayBuffer(file)
-  })
-}
+import AboutDialog from './AboutDialog'
+import CreateDirectoryDialog from './CreateDirectoryDialog'
+import DirectoriesTable from './DirectoriesTable'
+import FilesTable from './FilesTable'
+import PathNavigation from './PathNavigation'
 
 const styles = theme => ({
   actionButton: {
     margin: theme.spacing.unit,
+  },
+  appBarButton: {
+    marginLeft: theme.spacing.unit,
   },
   leftIcon: {
     marginRight: theme.spacing.unit,
@@ -146,215 +61,6 @@ const styles = theme => ({
   },
 })
 
-type DirectoriesTableProps = {
-  classes: Object,
-  directories: Array<string>,
-  onClickCreateDirectory: () => void,
-  tree: VirtualDir,
-  uploadFiles: (files: Array<File>, path: string) => any,
-}
-
-type DirectoriesTableState = {
-  selectedPath: ?string,
-}
-
-class DirectoriesTable extends Component<
-  DirectoriesTableProps,
-  DirectoriesTableState,
-> {
-  state = {
-    selectedPath: undefined,
-  }
-
-  render() {
-    const {
-      classes,
-      directories,
-      onClickCreateDirectory,
-      tree,
-      uploadFiles,
-    } = this.props
-
-    const rows = directories.map(path => {
-      const dir = tree.subpaths[path] || EMPTY_TREE
-      const name = path.split('/').slice(-2, -1)[0]
-      return (
-        <TableRow
-          key={path}
-          onDragEnter={e => {
-            e.dataTransfer.dropEffect = 'move'
-            this.setState({ selectedPath: path })
-          }}
-          onDragLeave={e => {
-            this.setState(({ selectedPath }) => {
-              return selectedPath === path ? { selectedPath: undefined } : null
-            })
-          }}
-          onDrop={e => {
-            uploadFiles(Array.from(e.dataTransfer.files), path)
-          }}
-          selected={this.state.selectedPath === path}>
-          <TableCell component="th" scope="row">
-            <a href="#contents" onClick={createOnClickPath(path)}>
-              {name}
-            </a>
-          </TableCell>
-          <TableCell>{dir.filesCount}</TableCell>
-          <TableCell>{dir.date ? dir.date.toUTCString() : null}</TableCell>
-          <TableCell>{bytes(dir.size)}</TableCell>
-        </TableRow>
-      )
-    })
-
-    return (
-      <Paper className={classes.paperContainer}>
-        <Typography className={classes.paperTitle} variant="h4">
-          Directories
-          <Button
-            className={classes.titleButton}
-            color="secondary"
-            onClick={onClickCreateDirectory}
-            size="medium"
-            variant="outlined">
-            <CreateFolderIcon className={classes.leftIcon} />
-            New directory
-          </Button>
-        </Typography>
-        {rows.length === 0 ? (
-          <Typography className={classes.tableEmpty}>No directory</Typography>
-        ) : (
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>Path</TableCell>
-                <TableCell>Files count</TableCell>
-                <TableCell>Date modified</TableCell>
-                <TableCell>Size</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>{rows}</TableBody>
-          </Table>
-        )}
-      </Paper>
-    )
-  }
-}
-
-type FilesTableProps = {
-  classes: Object,
-  files: Array<VirtualFile>,
-  getDownloadURL: (file: VirtualFile) => string,
-  onClickUpload: () => any,
-  onDeleteResource: (path: string) => any,
-  uploadFiles: (files: Array<File>) => any,
-}
-
-type FilesTableState = {
-  showDrop: boolean,
-}
-
-class FilesTable extends Component<FilesTableProps, FilesTableState> {
-  state = {
-    showDrop: false,
-  }
-
-  render() {
-    const {
-      classes,
-      files,
-      getDownloadURL,
-      onClickUpload,
-      onDeleteResource,
-      uploadFiles,
-    } = this.props
-
-    const rows = files.map(file => {
-      const name = file.path.split('/').slice(-1)[0]
-      return (
-        <TableRow key={file.hash}>
-          <TableCell component="th" scope="row">
-            {name}
-          </TableCell>
-          <TableCell>{file.hash}</TableCell>
-          <TableCell>{file.contentType}</TableCell>
-          <TableCell>{file.date.toUTCString()}</TableCell>
-          <TableCell>{bytes(file.size)}</TableCell>
-          <TableCell>
-            <Tooltip title="Download">
-              <IconButton
-                className={classes.actionButton}
-                component="a"
-                download={name}
-                href={getDownloadURL(file)}>
-                <DownloadIcon />
-              </IconButton>
-            </Tooltip>
-            <Tooltip title="Delete">
-              <IconButton
-                className={classes.actionButton}
-                aria-label="Delete"
-                onClick={e => {
-                  e.preventDefault()
-                  onDeleteResource(file.path)
-                }}>
-                <DeleteIcon />
-              </IconButton>
-            </Tooltip>
-          </TableCell>
-        </TableRow>
-      )
-    })
-
-    return (
-      <div>
-        <Paper
-          className={classes.paperContainer}
-          elevation={this.state.showDrop ? 20 : 2}
-          onDragEnter={e => {
-            e.dataTransfer.dropEffect = 'move'
-            e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.04)'
-          }}
-          onDragLeave={e => {
-            e.currentTarget.style.backgroundColor = 'white'
-          }}
-          onDrop={e => {
-            uploadFiles(Array.from(e.dataTransfer.files))
-          }}>
-          <Typography className={classes.paperTitle} variant="h4">
-            Files
-            <Button
-              className={classes.titleButton}
-              color="secondary"
-              onClick={onClickUpload}
-              size="medium"
-              variant="outlined">
-              <UploadIcon className={classes.leftIcon} />
-              Upload files
-            </Button>
-          </Typography>
-          {rows.length === 0 ? (
-            <Typography className={classes.tableEmpty}>No file</Typography>
-          ) : (
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell>Name</TableCell>
-                  <TableCell>Hash</TableCell>
-                  <TableCell>Type</TableCell>
-                  <TableCell>Date modified</TableCell>
-                  <TableCell>Size</TableCell>
-                  <TableCell>Actions</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>{rows}</TableBody>
-            </Table>
-          )}
-        </Paper>
-      </div>
-    )
-  }
-}
-
 type Props = {
   classes: Object,
 }
@@ -367,13 +73,12 @@ type State = {
   localPaths: Array<string>,
   lookupHash: string,
   newDirectoryName: string,
-  newDirectoryOpen: boolean,
+  openDialog: ?('about' | 'create-directory'),
   path: string,
   tree: ?VirtualDir,
 }
 
 class App extends Component<Props, State> {
-  client: SwarmClient
   inputRef = createRef()
   removeHistoryListener: () => void
   state = {
@@ -382,29 +87,18 @@ class App extends Component<Props, State> {
     localPaths: [],
     lookupHash: '',
     newDirectoryName: '',
-    newDirectoryOpen: false,
+    openDialog: undefined,
     path: '',
     tree: undefined,
   }
 
   componentDidMount() {
-    const bzzURL = window.location.href.includes('bzz:/')
-      ? `${window.location.protocol}//${window.location.host}`
-      : 'http://localhost:8500'
-    this.client = new SwarmClient(bzzURL)
     this.removeHistoryListener = history.listen(this.handleLocation)
     this.handleLocation(history.location)
   }
 
   componentWillUnmount() {
     this.removeHistoryListener()
-  }
-
-  getDownloadURL = (file: VirtualFile): string => {
-    return this.client.bzz.getDownloadURL(file.hash, {
-      contentType: file.contentType,
-      mode: 'raw',
-    })
   }
 
   isValidPath(nextPath: string): boolean {
@@ -423,7 +117,7 @@ class App extends Component<Props, State> {
     const params = getParams(location)
     if (params.hash != null && (tree == null || tree.hash !== params.hash)) {
       try {
-        const nextTree = await createTree(this.client, params.hash)
+        const nextTree = await createTree(params.hash)
         let nextPath = params.path || path
         if (nextPath == null || !this.isValidPath(nextPath)) {
           nextPath = ''
@@ -476,33 +170,11 @@ class App extends Component<Props, State> {
     }, {})
 
     const { path, tree } = this.state
-    const hash = await this.client.bzz.uploadDirectory(directoryData, {
+    const hash = await client.bzz.uploadDirectory(directoryData, {
       manifestHash: tree ? tree.hash : undefined,
       path: maybePath || path,
     })
     setParams({ hash })
-  }
-
-  onClickRoot = createOnClickPath('')
-
-  onClickDownload = async () => {
-    const { tree } = this.state
-    if (tree == null) {
-      return
-    }
-
-    const res = await this.client.bzz.download(
-      tree.hash,
-      { contentType: 'application/x-tar' },
-      { accept: 'application/x-tar' },
-    )
-    const blob = await res.blob()
-    const url = URL.createObjectURL(blob)
-
-    const a = document.createElement('a')
-    a.download = `${tree.hash}.tar`
-    a.href = url
-    a.dispatchEvent(new MouseEvent('click'))
   }
 
   onClickUpload = () => {
@@ -518,24 +190,28 @@ class App extends Component<Props, State> {
   }
 
   onClickNewBucket = async () => {
-    const hash = await this.client.bzz.uploadDirectory({})
+    const hash = await client.bzz.uploadDirectory({})
     setParams({ hash })
   }
 
   onDeleteResource = async (path: string) => {
     const { tree } = this.state
     if (tree != null) {
-      const hash = await this.client.bzz.deleteResource(tree.hash, path)
+      const hash = await client.bzz.deleteResource(tree.hash, path)
       setParams({ hash })
     }
   }
 
-  onCloseNewDirectory = () => {
-    this.setState({ newDirectoryOpen: false })
+  onCloseDialog = () => {
+    this.setState({ openDialog: undefined })
+  }
+
+  onOpenAbout = () => {
+    this.setState({ openDialog: 'about' })
   }
 
   onOpenNewDirectory = () => {
-    this.setState({ newDirectoryOpen: true, newDirectoryName: '' })
+    this.setState({ newDirectoryName: '', openDialog: 'create-directory' })
   }
 
   onChangeDirectoryName = (e: SyntheticInputEvent<HTMLInputElement>) => {
@@ -552,7 +228,7 @@ class App extends Component<Props, State> {
     } = this.state
 
     if (tree == null) {
-      this.onCloseNewDirectory()
+      this.onCloseDialog()
     } else {
       const name = newDirectoryName.endsWith('/')
         ? newDirectoryName
@@ -567,10 +243,10 @@ class App extends Component<Props, State> {
           },
           localPaths: [...localPaths, dirPath],
           newDirectoryName: '',
-          newDirectoryOpen: false,
+          openDialog: undefined,
         })
       } else {
-        this.onCloseNewDirectory()
+        this.onCloseDialog()
       }
     }
   }
@@ -596,7 +272,7 @@ class App extends Component<Props, State> {
       localDirectories,
       lookupHash,
       newDirectoryName,
-      newDirectoryOpen,
+      openDialog,
       path,
       tree,
     } = this.state
@@ -621,22 +297,25 @@ class App extends Component<Props, State> {
         )
       }
     } else {
+      let localSubDirs
       let subtree
       if (path == null || path === '') {
         subtree = tree
       } else if (tree.subpaths[path] != null) {
         subtree = tree.subpaths[path]
+        localSubDirs = (localDirectories[path] || []).map(p => path + p)
       } else {
         subtree = EMPTY_TREE
       }
 
-      const tables = (
+      contents = (
         <Fragment>
+          <PathNavigation classes={classes} hash={tree.hash} path={path} />
           <DirectoriesTable
             key={subtree.hash || 'empty'}
             classes={classes}
             directories={subtree.directories.concat(
-              localDirectories[path] || [],
+              localSubDirs || localDirectories[path] || [],
             )}
             onClickCreateDirectory={this.onOpenNewDirectory}
             tree={tree}
@@ -645,70 +324,10 @@ class App extends Component<Props, State> {
           <FilesTable
             classes={classes}
             files={subtree.files}
-            getDownloadURL={this.getDownloadURL}
             onClickUpload={this.onClickUpload}
             onDeleteResource={this.onDeleteResource}
             uploadFiles={this.uploadFiles}
           />
-        </Fragment>
-      )
-
-      const substeps = path
-        ? path
-            .split('/')
-            .slice(0, -1)
-            .reduce(
-              (acc, part) => {
-                const nextPath = `${acc.path}${part}/`
-                const link = (
-                  <a
-                    href="#contents"
-                    key={nextPath}
-                    onClick={createOnClickPath(nextPath)}>
-                    {part}
-                  </a>
-                )
-                return {
-                  items: [...acc.items, ' / ', link],
-                  path: nextPath,
-                }
-              },
-              {
-                items: [],
-                path: '',
-              },
-            )
-        : null
-
-      const steps = (
-        <Paper className={classes.paperContainer}>
-          <Typography className={classes.paperTitle} variant="h4">
-            Path
-            {path == null || path === '' ? (
-              <Button
-                className={classes.titleButton}
-                color="secondary"
-                onClick={this.onClickDownload}
-                size="small"
-                variant="outlined">
-                <DownloadIcon className={classes.leftIcon} />
-                Download
-              </Button>
-            ) : null}
-          </Typography>
-          <Typography className={classes.paperContents} variant="h6">
-            <a href="#contents" onClick={this.onClickRoot}>
-              {tree.hash}
-            </a>
-            {substeps ? substeps.items : null}
-          </Typography>
-        </Paper>
-      )
-
-      contents = (
-        <Fragment>
-          {steps}
-          {tables}
         </Fragment>
       )
     }
@@ -737,39 +356,28 @@ class App extends Component<Props, State> {
               <AddIcon className={classes.leftIcon} />
               New bucket
             </Button>
+            <Button
+              className={classes.appBarButton}
+              color="inherit"
+              onClick={this.onOpenAbout}
+              variant="outlined">
+              <InfoIcon className={classes.leftIcon} />
+              About
+            </Button>
           </Toolbar>
         </AppBar>
         {contents}
-        <Dialog
-          open={newDirectoryOpen}
-          onClose={this.onCloseNewDirectory}
-          aria-labelledby="form-dialog-title">
-          <DialogTitle id="form-dialog-title">
-            Create a new directory
-          </DialogTitle>
-          <DialogContent>
-            <TextField
-              autoFocus
-              margin="dense"
-              id="name"
-              label="New directory name"
-              onChange={this.onChangeDirectoryName}
-              value={newDirectoryName}
-              fullWidth
-            />
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={this.onCloseNewDirectory} color="secondary">
-              Cancel
-            </Button>
-            <Button
-              onClick={this.onCreateNewDirectory}
-              color="primary"
-              variant="contained">
-              Create
-            </Button>
-          </DialogActions>
-        </Dialog>
+        <AboutDialog
+          onClose={this.onCloseDialog}
+          open={openDialog === 'about'}
+        />
+        <CreateDirectoryDialog
+          name={newDirectoryName}
+          onChangeName={this.onChangeDirectoryName}
+          onClose={this.onCloseDialog}
+          onCreate={this.onCreateNewDirectory}
+          open={openDialog === 'create-directory'}
+        />
         <input
           multiple
           onChange={this.onUploadInputChange}
