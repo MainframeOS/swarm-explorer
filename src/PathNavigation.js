@@ -1,13 +1,11 @@
 // @flow
 
-import Button from '@material-ui/core/Button'
-import Paper from '@material-ui/core/Paper'
-import Typography from '@material-ui/core/Typography'
+import { Button, Paper, Typography } from '@material-ui/core'
 import DownloadIcon from '@material-ui/icons/CloudDownload'
 import React, { Component } from 'react'
 
 import { createOnClickPath } from './history'
-import { client } from './swarm'
+import { bzz } from './swarm'
 
 const onClickRoot = createOnClickPath('')
 
@@ -20,7 +18,7 @@ type Props = {
 export default class PathNavigation extends Component<Props> {
   onClickDownload = async () => {
     const { hash } = this.props
-    const res = await client.bzz.download(
+    const res = await bzz.download(
       hash,
       { contentType: 'application/x-tar' },
       { accept: 'application/x-tar' },

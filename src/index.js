@@ -1,6 +1,6 @@
 // @flow
 
-import { MuiThemeProvider, createMuiTheme } from '@material-ui/core/styles'
+import { MuiThemeProvider, createMuiTheme } from '@material-ui/core'
 import React from 'react'
 import ReactDOM from 'react-dom'
 import 'typeface-roboto'

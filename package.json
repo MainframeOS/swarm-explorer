@@ -5,24 +5,26 @@
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
-    "upload": "swarm --defaultpath ./build/index.html --recursive up ./build",
+    "setup": "erebos website:setup --http-gateway=https://swarm-gateways.net",
+    "upload": "erebos website:publish ./build --hash=7dda3ef7c4c058b5be70b16c01e8ef0988dcf8f83b8295a72fa04e2271e36530 --http-gateway=https://swarm-gateways.net --key-env=KEY",
     "deploy": "yarn build && yarn upload",
     "test": "flow check"
   },
   "dependencies": {
-    "@erebos/swarm-browser": "^0.4.2",
-    "@material-ui/core": "^3.2.2",
-    "@material-ui/icons": "^3.0.1",
-    "bytes": "^3.0.0",
-    "history": "^4.7.2",
-    "query-string": "^6.2.0",
-    "react": "^16.5.2",
-    "react-dom": "^16.5.2",
-    "react-scripts": "2.0.5",
-    "typeface-roboto": "^0.0.54"
+    "@erebos/api-bzz-browser": "^0.10.0",
+    "@material-ui/core": "^4.4.3",
+    "@material-ui/icons": "^4.4.3",
+    "bytes": "^3.1.0",
+    "history": "^4.10.1",
+    "query-string": "^6.8.3",
+    "react": "^16.10.1",
+    "react-dom": "^16.10.1",
+    "react-scripts": "3.1.2",
+    "typeface-roboto": "^0.0.75"
   },
   "devDependencies": {
-    "flow-bin": "^0.83.0"
+    "@erebos/cli": "^0.10.0",
+    "flow-bin": "^0.108.0"
   },
   "homepage": "./",
   "eslintConfig": {

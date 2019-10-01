@@ -1,9 +1,9 @@
 // @flow
 
-import createHistory from 'history/createBrowserHistory'
+import { createBrowserHistory } from 'history'
 import qs from 'query-string'
 
-const history = createHistory()
+const history = createBrowserHistory()
 
 export const setParams = (params: Object = {}, replace: boolean = false) => {
   const current = replace ? {} : qs.parse(history.location.search)

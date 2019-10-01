@@ -1,13 +1,15 @@
 // @flow
 
-import AppBar from '@material-ui/core/AppBar'
-import Button from '@material-ui/core/Button'
-import CssBaseline from '@material-ui/core/CssBaseline'
-import Paper from '@material-ui/core/Paper'
-import TextField from '@material-ui/core/TextField'
-import Toolbar from '@material-ui/core/Toolbar'
-import Typography from '@material-ui/core/Typography'
-import { withStyles } from '@material-ui/core/styles'
+import {
+  AppBar,
+  Button,
+  CssBaseline,
+  Paper,
+  TextField,
+  Toolbar,
+  Typography,
+  withStyles,
+} from '@material-ui/core'
 import AddIcon from '@material-ui/icons/AddCircle'
 import InfoIcon from '@material-ui/icons/Info'
 import React, { Component, Fragment, createRef } from 'react'
@@ -15,7 +17,7 @@ import React, { Component, Fragment, createRef } from 'react'
 import history, { getParams, setParams } from './history'
 import {
   EMPTY_TREE,
-  client,
+  bzz,
   createTree,
   readFileBuffer,
   type VirtualDir,
@@ -29,35 +31,35 @@ import PathNavigation from './PathNavigation'
 
 const styles = theme => ({
   actionButton: {
-    margin: theme.spacing.unit,
+    margin: theme.spacing(1),
   },
   appBarButton: {
-    marginLeft: theme.spacing.unit,
+    marginLeft: theme.spacing(1),
   },
   leftIcon: {
-    marginRight: theme.spacing.unit,
+    marginRight: theme.spacing(1),
   },
   lookupForm: {
     flexGrow: 1,
-    paddingLeft: theme.spacing.unit * 2,
-    paddingRight: theme.spacing.unit * 2,
+    paddingLeft: theme.spacing(2),
+    paddingRight: theme.spacing(2),
   },
   paperContainer: {
-    margin: theme.spacing.unit * 2,
+    margin: theme.spacing(1),
   },
   paperContents: {
-    padding: theme.spacing.unit,
+    padding: theme.spacing(1),
   },
   paperTitle: {
-    paddingLeft: theme.spacing.unit,
-    paddingTop: theme.spacing.unit,
+    paddingLeft: theme.spacing(1),
+    paddingTop: theme.spacing(1),
   },
   tableEmpty: {
-    padding: theme.spacing.unit * 2,
+    padding: theme.spacing(2),
   },
   titleButton: {
     float: 'right',
-    marginRight: theme.spacing.unit,
+    marginRight: theme.spacing(1),
   },
 })
 
@@ -170,7 +172,7 @@ class App extends Component<Props, State> {
     }, {})
 
     const { path, tree } = this.state
-    const hash = await client.bzz.uploadDirectory(directoryData, {
+    const hash = await bzz.uploadDirectory(directoryData, {
       manifestHash: tree ? tree.hash : undefined,
       path: maybePath || path,
     })
@@ -190,14 +192,14 @@ class App extends Component<Props, State> {
   }
 
   onClickNewBucket = async () => {
-    const hash = await client.bzz.uploadDirectory({})
+    const hash = await bzz.uploadDirectory({})
     setParams({ hash })
   }
 
   onDeleteResource = async (path: string) => {
     const { tree } = this.state
     if (tree != null) {
-      const hash = await client.bzz.deleteResource(tree.hash, path)
+      const hash = await bzz.deleteResource(tree.hash, path)
       setParams({ hash })
     }
   }
